@@ -256,10 +256,6 @@ clean:
 rebuild: clean all
 
 # ============================================
-# Information and help
-# ============================================
-
-# ============================================
 # Project structure
 # ============================================
 
@@ -283,6 +279,10 @@ list-sources:
 	@for f in $(SEQUENTIAL_ALGO) $(OPENMP_ALGO) $(PTHREADS_ALGO) $(CILK_ALGO); do \
 		if [ -f "$$f" ]; then echo "  $$f"; else echo "  $$f (missing)"; fi; \
 	done
+
+# ============================================
+# Information and help
+# ============================================
 
 .PHONY: info
 info:
@@ -379,12 +379,6 @@ help:
 	@$(ECHO) "  make check-deps         # Verify all dependencies"
 	@echo ""
 
-.PHONY: compile_commands
-compile_commands:
-	@echo "Generating compile_commands.json with Bear..."
-	@bear -- make all
-	@echo "✓ compile_commands.json generated!"
-
 .DEFAULT_GOAL := all
 
 # ============================================
@@ -392,4 +386,4 @@ compile_commands:
 # ============================================
 
 .PHONY: all clean rebuild tree list-sources info check-deps help \
-        sequential openmp pthreads cilk list-binaries compile_commands
+        sequential openmp pthreads cilk list-binaries
