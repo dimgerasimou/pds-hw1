@@ -42,7 +42,7 @@ usage(void) {
 }
 
 static int parseargs(int argc, char *argv[], int *n_threads, int *n_trials, char **filepath) {
-    *n_threads = 0;
+    *n_threads = 8;
     *n_trials = 1;
     *filepath = NULL;
 
@@ -108,10 +108,12 @@ static int parseargs(int argc, char *argv[], int *n_threads, int *n_trials, char
 int main(int argc, char *argv[]) {
 
     CSCBinaryMatrix *matrix;
+    Benchmark *benchmark = NULL;
     char *filepath;
     int n_trials = 1;
     int n_threads = 0;
     int ret = 0;
+    int (*cc_func)(const CSCBinaryMatrix*, const int);
 
     set_program_name(argv[0]);
 
@@ -123,16 +125,27 @@ int main(int argc, char *argv[]) {
     if (!matrix)
         return 1;
 
+    benchmark = benchmark_init(IMPLEMENTATION_NAME, filepath, n_trials, n_threads, matrix);
+    if (!benchmark) {
+        csc_free_matrix(matrix);
+        return 1;
+    }
+
     #if defined(USE_OPENMP)
-    ret = benchmark_cc(cc_openmp, matrix, n_threads, n_trials, IMPLEMENTATION_NAME);
+    cc_func = cc_openmp;
     #elif defined(USE_PTHREADS)
-    ret = benchmark_cc(cc_pthreads, matrix, n_threads, n_trials, IMPLEMENTATION_NAME);
+    cc_func = cc_pthreads;
     #elif defined(USE_CILK)
-    ret = benchmark_cc(cc_cilk, matrix, n_threads, n_trials, IMPLEMENTATION_NAME);
+    cc_func = cc_cilk;
     #elif defined(USE_SEQUENTIAL)
-    ret = benchmark_cc(cc_sequential, matrix, n_threads, n_trials, IMPLEMENTATION_NAME);
+    cc_func = cc_sequential;
     #endif
 
+    ret = benchmark_cc(cc_func, matrix, benchmark);
+
+    benchmark_print(benchmark);
+
+    benchmark_free(benchmark);
     csc_free_matrix(matrix);
     return ret;
 }

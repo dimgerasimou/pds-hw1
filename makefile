@@ -13,6 +13,8 @@ PROJECT := connected_components
 export CC := gcc
 export CLANG := clang
 
+CILK_PATH := /usr/local/opencilk
+
 # Base compiler flags
 BASE_CFLAGS := -Wall -Wextra -Wpedantic -std=c11 -O3 -march=native
 BASE_CFLAGS += -Isrc/core -Isrc/algorithms -Isrc/utils
@@ -21,13 +23,13 @@ BASE_CFLAGS += -Isrc/core -Isrc/algorithms -Isrc/utils
 SEQUENTIAL_CFLAGS := $(BASE_CFLAGS) -DUSE_SEQUENTIAL
 OPENMP_CFLAGS := $(BASE_CFLAGS) -fopenmp -DUSE_OPENMP
 PTHREADS_CFLAGS := $(BASE_CFLAGS) -pthread -DUSE_PTHREADS
-CILK_CFLAGS := $(BASE_CFLAGS) -fopencilk -DUSE_CILK -I/usr/local/opencilk/include
+CILK_CFLAGS := $(BASE_CFLAGS) -fopencilk -DUSE_CILK -I$(CILK_PATH)/include
 
 # Linker flags
 SEQUENTIAL_LDFLAGS :=
 OPENMP_LDFLAGS := -fopenmp
 PTHREADS_LDFLAGS := -pthread
-CILK_LDFLAGS := -fopencilk -L/usr/local/opencilk/lib
+CILK_LDFLAGS := -fopencilk -L$(CILK_PATH)/lib
 
 # Common libraries
 LDLIBS := -lmatio -lm

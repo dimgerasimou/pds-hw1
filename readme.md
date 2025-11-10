@@ -15,4 +15,6 @@ In this repo is located the source code required for the first homework exercise
 
 ## Execution
 
+Make sure that cilk path is correct for you installation in makefile.
+
 You can compile it with `make`. To run use `./pardis0 "path_to_dataset.mat"`.
