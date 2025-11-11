@@ -96,7 +96,7 @@ This command:
 * Uses up to 16 threads where applicable.
 * Prints JSON to `stdout`.
 
-Alternatively tou can use:
+Alternatively you can use:
 
 ```bash
 make benchmark-save MATRIX=data/dictionary28.mat TRIALS=100 THREADS=16
