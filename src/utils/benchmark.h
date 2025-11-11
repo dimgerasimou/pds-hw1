@@ -13,27 +13,85 @@
 #include "matrix.h"
 
 /**
+ * @struct Statistics
+ * @brief Statistical summary of benchmark timing results
+ * 
+ * Provides comprehensive timing statistics computed across multiple
+ * benchmark trials.
+ */
+typedef struct {
+    double mean_time_s;    /**< Mean execution time in seconds */
+    double std_dev_s;      /**< Standard deviation of execution time in seconds */
+    double median_time_s;  /**< Median execution time in seconds */
+    double min_time_s;     /**< Minimum execution time in seconds */
+    double max_time_s;     /**< Maximum execution time in seconds */
+} Statistics;
+
+/**
+ * @struct Result
+ * @brief Complete benchmark result for a single algorithm
+ * 
+ * Contains all measured and computed metrics for one algorithm implementation.
+ */
+typedef struct {
+    char algorithm[32];                /**< Algorithm name (e.g., "Sequential", "OpenMP") */
+    int connected_components;          /**< Number of connected components found */
+    Statistics stats;                  /**< Timing statistics */
+    double throughput_edges_per_sec;   /**< Processing throughput in edges per second */
+    double memory_peak_mb;             /**< Peak memory usage in megabytes */
+    double speedup;                    /**< Speedup relative to sequential baseline */
+    double efficiency;                 /**< Parallel efficiency (speedup / threads) */
+    int has_metrics;                   /**< Flag indicating if speedup/efficiency are valid */
+} Result;
+
+/**
+ * @struct SystemInfo
+ * @brief System information captured during benchmark execution
+ * 
+ * Contains details about the hardware and system configuration where
+ * the benchmark was executed.
+ */
+typedef struct {
+    char timestamp[32];    /**< ISO 8601 timestamp of benchmark execution */
+    char cpu_info[128];    /**< CPU model and specifications */
+    double ram_mb;         /**< Total RAM in megabytes */
+    double swap_mb;        /**< Total swap space in megabytes */
+} SystemInfo;
+
+/**
+ * @struct MatrixInfo
+ * @brief Information about the input matrix/graph
+ * 
+ * Describes the sparse matrix used as input for the connected
+ * components algorithm, including its dimensions and sparsity.
+ */
+typedef struct {
+    char path[256];  /**< File path to the matrix */
+    int rows;        /**< Number of rows in the matrix */
+    int cols;        /**< Number of columns in the matrix */
+    int nnz;         /**< Number of non-zero elements (edges in graph) */
+} MatrixInfo;
+
+/**
+ * @struct BenchmarkInfo
+ * @brief Benchmark execution parameters
+ * 
+ * Contains the configuration parameters used for running the benchmark.
+ */
+typedef struct {
+    int threads;  /**< Number of threads used for parallel execution */
+    int trials;   /**< Number of benchmark trials performed */
+} BenchmarkInfo;
+
+/**
  * @brief Holds benchmark results and metadata.
  */
 typedef struct {
-    char   *algorithm_name;       /**< Name of the algorithm being benchmarked. */
-    char   *dataset_filepath;     /**< Path to the dataset file used for benchmarking. */
     double *times;                /**< Array of trial execution times in seconds. */
-
-    double time_max;              /**< Maximum execution time among trials. */
-    double time_min;              /**< Minimum execution time among trials. */
-    double time_median;           /**< Median execution time among trials. */
-    double time_avg;              /**< Average execution time among trials. */
-    double time_stddev;           /**< Standard deviation of execution times. */
-
-    int    connected_components;  /**< Number of connected components found. */
-
-    uint8_t  n_threads;           /**< Number of threads used. */
-    uint16_t n_trials;            /**< Number of benchmark trials. */
-
-    uint32_t matrix_rows;         /**< Number of rows in the input matrix. */
-    uint32_t matrix_cols;         /**< Number of columns in the input matrix. */
-    uint32_t matrix_nnz;          /**< Number of nonzero elements in the matrix. */
+    SystemInfo sys_info;          /**< System information */
+    MatrixInfo matrix_info;       /**< Matrix/graph information */
+    BenchmarkInfo benchmark_info; /**< Benchmark parameters */
+    Result result;                /**< Algorithm result */
 } Benchmark;
 
 /**

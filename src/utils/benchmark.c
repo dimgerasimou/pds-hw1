@@ -16,6 +16,7 @@
 
 #include "error.h"
 #include "benchmark.h"
+#include "json.h"
 
 /* ------------------------------------------------------------------------- */
 /*                            Static Helper Functions                        */
@@ -58,30 +59,33 @@ calculate_time_statistics(Benchmark *b)
     if (!b)
         return 1;
 
-    double *sorted = malloc(b->n_trials * sizeof(double));
+    size_t n_trials = b->benchmark_info.trials;
+
+    double *sorted = malloc(n_trials * sizeof(double));
     if (!sorted) {
         print_error(__func__, "malloc() allocation failed", errno);
         return 1;
     }
 
-    memcpy(sorted, b->times, b->n_trials * sizeof(double));
-    qsort(sorted, b->n_trials, sizeof(double), cmp_double);
+    memcpy(sorted, b->times, n_trials * sizeof(double));
+    qsort(sorted, n_trials, sizeof(double), cmp_double);
 
-    b->time_min = sorted[0];
-    b->time_max = sorted[b->n_trials - 1];
-    b->time_median = (b->n_trials % 2)
-        ? sorted[b->n_trials / 2]
-        : (sorted[b->n_trials / 2] + sorted[b->n_trials / 2 - 1]) / 2.0;
+    b->result.stats.min_time_s = sorted[0];
+    b->result.stats.max_time_s = sorted[n_trials - 1];
+    b->result.stats.median_time_s = (n_trials % 2)
+        ? sorted[n_trials / 2]
+        : (sorted[n_trials / 2] + sorted[n_trials / 2 - 1]) / 2.0;
 
     double sum = 0.0, sum_sq = 0.0;
-    for (uint16_t i = 0; i < b->n_trials; i++) {
+    for (uint16_t i = 0; i < n_trials; i++) {
         sum += sorted[i];
         sum_sq += sorted[i] * sorted[i];
     }
 
-    b->time_avg = sum / b->n_trials;
-    b->time_stddev = (b->n_trials > 1)
-        ? sqrt((sum_sq - b->n_trials * b->time_avg * b->time_avg) / (b->n_trials - 1))
+    double time_avg = sum / n_trials;
+    b->result.stats.mean_time_s = time_avg;
+    b->result.stats.std_dev_s = (n_trials > 1)
+        ? sqrt((sum_sq - n_trials * time_avg * time_avg) / (n_trials - 1))
         : 0.0;
 
     free(sorted);
@@ -92,37 +96,37 @@ calculate_time_statistics(Benchmark *b)
  * @brief Retrieves system memory information in MB.
  */
 static void
-get_memory_info(double *ram_mb, double *swap_mb)
+get_memory_info(Benchmark *b)
 {
     struct sysinfo info;
     if (sysinfo(&info) == 0) {
-        *ram_mb  = info.totalram  / 1024.0 / 1024.0 * info.mem_unit;
-        *swap_mb = info.totalswap / 1024.0 / 1024.0 * info.mem_unit;
+        b->sys_info.ram_mb  = info.totalram  / 1024.0 / 1024.0 * info.mem_unit;
+        b->sys_info.swap_mb = info.totalswap / 1024.0 / 1024.0 * info.mem_unit;
     } else {
-        *ram_mb = *swap_mb = 0.0;
+        b->sys_info.ram_mb = b->sys_info.swap_mb = 0.0;
     }
 }
 
 /**
  * @brief Returns the peak resident set size (RSS) in MB.
  */
-static double
-get_peak_rss_mb(void)
+static void
+get_peak_rss_mb(Benchmark *b)
 {
     struct rusage usage;
     getrusage(RUSAGE_SELF, &usage);
-    return usage.ru_maxrss / 1024.0; // ru_maxrss in KB on Linux
+    b->result.memory_peak_mb = usage.ru_maxrss / 1024.0;
 }
 
 /**
  * @brief Retrieves CPU model information from /proc/cpuinfo.
  */
 static void
-get_cpu_info(char *buf, size_t size)
+get_cpu_info(Benchmark *b)
 {
     FILE *f = fopen("/proc/cpuinfo", "r");
     if (!f) {
-        snprintf(buf, size, "unknown");
+        snprintf(b->sys_info.cpu_info, sizeof(b->sys_info.cpu_info), "unknown");
         return;
     }
 
@@ -131,8 +135,8 @@ get_cpu_info(char *buf, size_t size)
         if (strncmp(line, "model name", 10) == 0) {
             char *p = strchr(line, ':');
             if (p) {
-                snprintf(buf, size, "%s", p + 2); // skip ": "
-                buf[strcspn(buf, "\n")] = 0;      // remove newline
+                snprintf(b->sys_info.cpu_info, sizeof(b->sys_info.cpu_info), "%s", p + 2); // skip ": "
+                b->sys_info.cpu_info[strcspn(b->sys_info.cpu_info, "\n")] = 0;      // remove newline
             }
             break;
         }
@@ -144,12 +148,12 @@ get_cpu_info(char *buf, size_t size)
  * @brief Generates an ISO-8601 formatted timestamp.
  */
 static void
-get_iso_timestamp(char *buf, size_t size)
+get_iso_timestamp(Benchmark *b)
 {
     time_t t = time(NULL);
     struct tm tm;
     localtime_r(&t, &tm);
-    strftime(buf, size, "%Y-%m-%dT%H:%M:%S", &tm);
+    strftime(b->sys_info.timestamp, sizeof(b->sys_info.timestamp), "%Y-%m-%dT%H:%M:%S", &tm);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -177,30 +181,25 @@ benchmark_init(const char *name,
         return NULL;
     }
 
-    b->n_threads = n_threads;
-    b->n_trials  = n_trials;
-    b->matrix_rows = mat->nrows;
-    b->matrix_cols = mat->ncols;
-    b->matrix_nnz  = mat->nnz;
-    b->algorithm_name = NULL;
-    b->dataset_filepath = NULL;
+    // Add matrix info
+    b->matrix_info.cols = mat->ncols;
+    b->matrix_info.rows = mat->nrows;
+    b->matrix_info.nnz = mat->nnz;
+    strncpy(b->matrix_info.path, filepath, sizeof(b->matrix_info.path));
+    b->matrix_info.path[sizeof(b->matrix_info.path) - 1] = '\0';
+
+    // Add benchmark info
+    b->benchmark_info.threads = n_threads;
+    b->benchmark_info.trials  = n_trials;
+
+    // Add result
+    b->result.has_metrics = 0;
+    strncpy(b->result.algorithm, name, sizeof(b->result.algorithm));
+    b->result.algorithm[sizeof(b->result.algorithm) - 1] = '\0';
+
     b->times = NULL;
 
-    b->algorithm_name = strdup(name);
-    if (!b->algorithm_name) {
-        print_error(__func__, "strdup() failed", errno);
-        benchmark_free(b);
-        return NULL;
-    }
-
-    b->dataset_filepath = strdup(filepath);
-    if (!b->dataset_filepath) {
-        print_error(__func__, "strdup() failed", errno);
-        benchmark_free(b);
-        return NULL;
-    }
-
-    b->times = malloc(b->n_trials * sizeof(double));
+    b->times = malloc(n_trials * sizeof(double));
     if (!b->times) {
         print_error(__func__, "malloc() failed", errno);
         benchmark_free(b);
@@ -217,9 +216,7 @@ void
 benchmark_free(Benchmark *b)
 {
     if (!b) return;
-    free(b->algorithm_name);
-    free(b->dataset_filepath);
-    free(b->times);
+    if (b->times) free(b->times);
     free(b);
 }
 
@@ -231,18 +228,18 @@ benchmark_cc(int (*cc_func)(const CSCBinaryMatrix*, const int),
                  const CSCBinaryMatrix *m,
                  Benchmark *b)
 {
-    b->connected_components = cc_func(m, b->n_threads); /* warm-up run */
+    b->result.connected_components = cc_func(m, b->benchmark_info.threads); /* warm-up run */
 
-    for (int i = 0; i < b->n_trials; i++) {
+    for (int i = 0; i < b->benchmark_info.trials; i++) {
         double start_time = now_sec();
-        int result = cc_func(m, b->n_threads);
+        int result = cc_func(m, b->benchmark_info.threads);
         b->times[i] = now_sec() - start_time;
 
         if (result < 0)
             return 1;
 
-        if (result != b->connected_components) {
-            printf("[%s] Components between retries don't match\n", b->algorithm_name);
+        if (result != b->result.connected_components) {
+            printf("[%s] Components between retries don't match\n", b->result.algorithm);
             return 2;
         }
     }
@@ -258,47 +255,23 @@ benchmark_print(Benchmark *b)
 {
     if (!b) return;
 
-    char timestamp[32], cpuinfo[128];
-    double ram_mb, swap_mb, throughput, mem_peak;
-
     calculate_time_statistics(b);
-    get_iso_timestamp(timestamp, sizeof(timestamp));
-    get_cpu_info(cpuinfo, sizeof(cpuinfo));
-    get_memory_info(&ram_mb, &swap_mb);
-    throughput = b->matrix_nnz / b->time_avg;
-    mem_peak = get_peak_rss_mb();
+    
+    get_iso_timestamp(b);
+    get_cpu_info(b);
+    get_memory_info(b);
+    b->result.throughput_edges_per_sec = b->matrix_info.nnz / b->result.stats.mean_time_s;
+    get_peak_rss_mb(b);
 
     printf("{\n");
-    printf("  \"sys_info\": {\n");
-    printf("    \"timestamp\": \"%s\",\n", timestamp);
-    printf("    \"cpu_info\": \"%s\",\n", cpuinfo);
-    printf("    \"ram_mb\": %.2f,\n", ram_mb);
-    printf("    \"swap_mb\": %.2f\n", swap_mb);
-    printf("  },\n");
-    printf("  \"matrix_info\": {\n");
-    printf("    \"path\": \"%s\",\n", b->dataset_filepath);
-    printf("    \"rows\": %u,\n", b->matrix_rows);
-    printf("    \"cols\": %u,\n", b->matrix_cols);
-    printf("    \"nnz\": %u\n", b->matrix_nnz);
-    printf("  },\n");
-    printf("  \"benchmark_info\": {\n");
-    printf("    \"threads\": %u,\n", b->n_threads);
-    printf("    \"trials\": %u\n", b->n_trials);
-    printf("  },\n");
+    print_sys_info(&(b->sys_info), 2);
+    printf(",\n");
+    print_matrix_info(&(b->matrix_info), 2);
+    printf(",\n");
+    print_benchmark_info(&(b->benchmark_info), 2);
+    printf(",\n");
     printf("  \"results\": [\n");
-    printf("    {\n");
-    printf("      \"algorithm\": \"%s\",\n", b->algorithm_name);
-    printf("      \"connected_components\": %d,\n", b->connected_components);
-    printf("      \"statistics\": {\n");
-    printf("        \"mean_time_s\": %.6f,\n", b->time_avg);
-    printf("        \"std_dev_s\": %.6f,\n", b->time_stddev);
-    printf("        \"median_time_s\": %.6f,\n", b->time_median);
-    printf("        \"min_time_s\": %.6f,\n", b->time_min);
-    printf("        \"max_time_s\": %.6f\n", b->time_max);
-    printf("      },\n");
-    printf("      \"throughput_edges_per_sec\": %.2f,\n", throughput);
-    printf("      \"memory_peak_mb\": %.2f\n", mem_peak);
-    printf("    }\n");
-    printf("  ]\n");
+    print_result(&(b->result), 4);
+    printf("\n  ]\n");
     printf("}\n");
 }

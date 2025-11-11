@@ -75,7 +75,7 @@ CILK_OBJS := $(CORE_SRCS:$(SRC_DIR)/%.c=$(OBJ_DIR)/cilk/%.o) \
 
 # Benchmark runner sources
 RUNNER_MAIN_SRC := $(SRC_DIR)/runner.c
-RUNNER_UTILS := $(SRC_DIR)/utils/error.c $(SRC_DIR)/utils/args.c
+RUNNER_UTILS := $(SRC_DIR)/utils/error.c $(SRC_DIR)/utils/args.c $(SRC_DIR)/utils/json.c
 
 # Runner object files
 RUNNER_OBJS := $(RUNNER_MAIN_SRC:$(SRC_DIR)/%.c=$(OBJ_DIR)/runner/%.o) \

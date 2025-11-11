@@ -1,9 +1,6 @@
 /**
- * @file benchmark_runner.c
- * @brief Unified benchmark runner for all connected components implementations.
- * 
- * This program executes all four algorithm implementations (sequential, OpenMP,
- * Pthreads, Cilk) and combines their results into a single JSON output.
+ * @file runner.c
+ * @brief Unified benchmark runner
  */
 
 #define _POSIX_C_SOURCE 200809L
@@ -15,8 +12,9 @@
 #include <sys/wait.h>
 #include <errno.h>
 
-#include "error.h"
 #include "args.h"
+#include "error.h"
+#include "json.h"
 
 #define MAX_BUFFER 65536
 #define MAX_RESULTS 4
@@ -27,15 +25,9 @@ typedef struct {
     char *name;
     char *binary_path;
     char *output;
+    BenchmarkData data;
     int success;
 } BenchmarkResult;
-
-/**
- * @brief Indents stdout by n characters.
- */
-static void indent(int n) {
-    for (int i = 0; i < n; i++) putchar(' ');
-}
 
 /**
  * @brief Executes a single benchmark binary and captures its output.
@@ -105,7 +97,7 @@ run_benchmark(const char *binary, const char *matrix_file,
     } else if (WIFSIGNALED(status)) {
         fprintf(stderr, "[%s] Terminated by signal %d (%s)\n",
                 binary, WTERMSIG(status), strsignal(WTERMSIG(status)));
-        return 128 + WTERMSIG(status); // standard convention
+        return 128 + WTERMSIG(status);
     } else {
         fprintf(stderr, "[%s] Unknown termination cause\n", binary);
         return -1;
@@ -113,88 +105,40 @@ run_benchmark(const char *binary, const char *matrix_file,
 }
 
 /**
- * @brief Extracts a JSON object or array by finding matching braces/brackets.
+ * @brief Find sequential baseline time from results.
  */
-static char*
-extract_json_block(const char *json, const char *key, char open, char close)
+static double
+find_sequential_time(BenchmarkResult *results, int count)
 {
-    char search[128];
-    snprintf(search, sizeof(search), "\"%s\":", key);
-    
-    const char *start = strstr(json, search);
-    if (!start) return NULL;
-
-    start = strchr(start, open);
-    if (!start) return NULL;
-
-    int count = 1;
-    const char *p = start + 1;
-    
-    while (*p && count > 0) {
-        if (*p == open) count++;
-        else if (*p == close) count--;
-        p++;
+    for (int i = 0; i < count; i++) {
+        if (!results[i].success || !results[i].data.valid) continue;
+        
+        if (strcmp(results[i].data.result.algorithm, "Sequential") == 0) {
+            return results[i].data.result.stats.mean_time_s;
+        }
     }
-
-    if (count != 0) {
-        print_error(__func__, "unbalanced braces in JSON block", 0);
-        return NULL;
-    }
-
-    size_t len = p - start;
-    char *result = malloc(len + 1);
-    if (!result) {
-        print_error(__func__, "malloc() failed", errno);
-        return NULL;
-    }
-
-    memcpy(result, start, len);
-    result[len] = '\0';
-    return result;
+    return -1.0;
 }
 
 /**
- * @brief Extracts a single result object from the results array.
+ * @brief Compute speedup and efficiency for all results.
  */
-static char*
-extract_single_result(const char *results_array)
+static void
+compute_performance_metrics(BenchmarkResult *results, int count, int threads)
 {
-    const char *start = strchr(results_array, '{');
-    if (!start) return NULL;
-
-    int brace_count = 1;
-    const char *p = start + 1;
+    double sequential_time = find_sequential_time(results, count);
+    if (sequential_time <= 0) return;
     
-    while (*p && brace_count > 0) {
-        if (*p == '{') brace_count++;
-        else if (*p == '}') brace_count--;
-        p++;
+    for (int i = 0; i < count; i++) {
+        if (!results[i].success || !results[i].data.valid) continue;
+        
+        double mean_time = results[i].data.result.stats.mean_time_s;
+        if (mean_time > 0) {
+            results[i].data.result.speedup = sequential_time / mean_time;
+            results[i].data.result.efficiency = results[i].data.result.speedup / threads;
+            results[i].data.result.has_metrics = 1;
+        }
     }
-
-    if (brace_count != 0) {
-        print_error(__func__, "unbalanced braces in JSON block", 0);
-        return NULL;
-    }
-
-    size_t len = p - start;
-    char *result = malloc(len + 1);
-    if (!result) {
-        print_error(__func__, "malloc() failed", errno);
-        return NULL;
-    }
-
-    memcpy(result, start, len);
-    result[len] = '\0';
-    return result;
-}
-
-/**
- * @brief Extracts the results array from individual benchmark JSON output.
- */
-static char*
-extract_results_array(const char *json_output)
-{
-    return extract_json_block(json_output, "results", '[', ']');
 }
 
 /**
@@ -203,55 +147,42 @@ extract_results_array(const char *json_output)
 static void
 print_combined_results(BenchmarkResult *results, int count)
 {
-    char *sys_info = NULL;
-    char *matrix_info = NULL;
-    char *benchmark_info = NULL;
-
+    // Find first valid result for metadata
+    BenchmarkData *first = NULL;
     for (int i = 0; i < count; i++) {
-        if (!results[i].success || !results[i].output) continue;
-        sys_info = extract_json_block(results[i].output, "sys_info", '{', '}');
-        matrix_info = extract_json_block(results[i].output, "matrix_info", '{', '}');
-        benchmark_info = extract_json_block(results[i].output, "benchmark_info", '{', '}');
-        if (sys_info && matrix_info && benchmark_info)
+        if (results[i].success && results[i].data.valid) {
+            first = &results[i].data;
             break;
+        }
     }
-
-    if (!sys_info || !matrix_info || !benchmark_info) {
-        print_error(__func__, "JSON file corrupted", 0);
-        free(sys_info); free(matrix_info); free(benchmark_info);
+    
+    if (!first) {
+        print_error(__func__, "No valid benchmark results found", 0);
         return;
     }
-
-    indent(0); printf("{\n");
-    indent(2); printf("\"sys_info\": %s,\n", sys_info);
-    indent(2); printf("\"matrix_info\": %s,\n", matrix_info);
-    indent(2); printf("\"benchmark_info\": %s,\n", benchmark_info);
-    indent(2); printf("\"results\": [\n");
-
-    int first = 1;
+    
+    // Print combined JSON
+    printf("{\n");
+    print_sys_info(&first->sys_info, 2);
+    printf(",\n");
+    print_matrix_info(&first->matrix_info, 2);
+    printf(",\n");
+    print_benchmark_info(&first->benchmark_info, 2);
+    printf(",\n");
+    
+    printf("  \"results\": [\n");
+    
+    int first_result = 1;
     for (int i = 0; i < count; i++) {
-        if (!results[i].success) continue;
-
-        char *results_array = extract_results_array(results[i].output);
-        if (!results_array) continue;
-
-        char *single_result = extract_single_result(results_array);
-        free(results_array);
-        if (!single_result) continue;
+        if (!results[i].success || !results[i].data.valid) continue;
         
-        if (!first) printf(",\n");
-        indent(4); printf("%s", single_result);
-        free(single_result);
-        first = 0;
+        if (!first_result) printf(",\n");
+        print_result(&results[i].data.result, 4);
+        first_result = 0;
     }
-
-    printf("\n");
-    indent(2); printf("]\n");
-    indent(0); printf("}\n");
-
-    free(sys_info);
-    free(matrix_info);
-    free(benchmark_info);
+    
+    printf("\n  ]\n");
+    printf("}\n");
 }
 
 int
@@ -273,7 +204,6 @@ main(int argc, char *argv[])
 
     if (access(matrix_file, R_OK) != 0) {
         char err[MAX_BUFFER];
-
         snprintf(err, sizeof(err), "Error: cannot access matrix file '%s': %s",
                 matrix_file, strerror(errno));
         print_error(__func__, err, errno);
@@ -305,8 +235,14 @@ main(int argc, char *argv[])
                                threads, trials, &results[i].output);
         
         if (ret == 0) {
-            results[i].success = 1;
-            fprintf(stderr, "[%s] Completed successfully\n", results[i].name);
+            // Parse the output
+            if (parse_benchmark_data(results[i].output, &results[i].data)) {
+                results[i].success = 1;
+                fprintf(stderr, "[%s] Completed successfully\n", results[i].name);
+            } else {
+                results[i].success = 0;
+                fprintf(stderr, "[%s] Failed to parse output\n", results[i].name);
+            }
         } else {
             results[i].success = 0;
             fprintf(stderr, "[%s] Failed with exit code %d\n", results[i].name, ret);
@@ -315,6 +251,9 @@ main(int argc, char *argv[])
             }
         }
     }
+
+    // Compute speedup and efficiency
+    compute_performance_metrics(results, MAX_RESULTS, threads);
 
     fprintf(stderr, "\n");
     print_combined_results(results, MAX_RESULTS);
