@@ -62,7 +62,7 @@ main(int argc, char *argv[])
     }
     
     /* Load the sparse matrix */
-    matrix = csc_load_matrix(filepath, "Problem", "A");
+    matrix = csc_load_matrix(filepath);
     if (!matrix)
         return 1;
 

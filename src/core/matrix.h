@@ -1,9 +1,9 @@
 /**
  * @file matrix.h
- * @brief Compressed Sparse Column (CSC) matrix utilities for binary matrices.
+ * @brief CSC (Compressed Sparse Column) binary matrix structure and API.
  *
  * Provides functionality to load, free, and print sparse binary matrices
- * stored in CSC format.
+ * stored in CSC format. Non-zero values are represented implicitly as 1.
  */
 
 #ifndef MATRIX_H
@@ -26,24 +26,23 @@ typedef struct {
     uint32_t *col_ptr;  /**< Column pointers (length ncols + 1) */
 } CSCBinaryMatrix;
 
-/**
- * @brief Load a sparse binary matrix from a MAT file.
+/** @brief Load a sparse binary matrix from a .mat or .mtx file.
  *
- * @param filename Path to the MAT file containing the matrix.
- * @param matrix_name Name of the struct variable in the file.
- * @param field_name Name of the field containing the sparse matrix.
- * @return Pointer to a newly allocated CSCBinaryMatrix on success, NULL on failure.
+ * Dispatches automatically based on file extension.
+ *
+ * @param path Path to the matrix file.
+ * @return Newly allocated CSCBinaryMatrix, or NULL on failure.
  *
  * @note The returned matrix must be freed using csc_free_matrix().
  */
-CSCBinaryMatrix *csc_load_matrix(const char *filename,
-                                 const char *matrix_name,
-                                 const char *field_name);
+CSCBinaryMatrix *csc_load_matrix(const char *path);
 
 /**
- * @brief Free a CSCBinaryMatrix and its internal arrays.
+ * @brief Free a CSCBinaryMatrix and its associated memory.
  *
- * @param m Pointer to the CSCBinaryMatrix to free. Safe to call with NULL.
+ * Safe to call with NULL.
+ *
+ * @param m CSC matrix to free.
  */
 void csc_free_matrix(CSCBinaryMatrix *m);
 
