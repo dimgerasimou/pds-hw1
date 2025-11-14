@@ -429,12 +429,13 @@ benchmark-compare: all
 		$(ECHO) "Usage: make benchmark-compare MATRIX=path/to/matrix.mat [THREADS=8] [TRIALS=10]"; \
 		exit 1; \
 	fi
-	@mkdir -p benchmarks
+	$(eval COMPARISON_PATH := benchmarks/comparison-$(shell date +%Y%m%d_%H%M%S))
+	@mkdir -p $(COMPARISON_PATH)
 	@$(ECHO) "$(COLOR_CYAN)Running variant 0 (standard)...$(COLOR_RESET)"
-	@$(RUNNER_TARGET) -t $(if $(THREADS),$(THREADS),8) -n $(if $(TRIALS),$(TRIALS),10) -v 0 $(MATRIX) > benchmarks/variant0-$(shell date +%Y%m%d_%H%M%S).json
+	@$(RUNNER_TARGET) -t $(if $(THREADS),$(THREADS),8) -n $(if $(TRIALS),$(TRIALS),10) -v 0 $(MATRIX) > $(COMPARISON_PATH)/variant0.json
 	@$(ECHO) "$(COLOR_CYAN)Running variant 1 (optimized)...$(COLOR_RESET)"
-	@$(RUNNER_TARGET) -t $(if $(THREADS),$(THREADS),8) -n $(if $(TRIALS),$(TRIALS),10) -v 1 $(MATRIX) > benchmarks/variant1-$(shell date +%Y%m%d_%H%M%S).json
-	@$(ECHO) "$(COLOR_GREEN)✓ Comparison complete. Results saved to benchmarks/$(COLOR_RESET)"
+	@$(RUNNER_TARGET) -t $(if $(THREADS),$(THREADS),8) -n $(if $(TRIALS),$(TRIALS),10) -v 1 $(MATRIX) > $(COMPARISON_PATH)/variant1.json
+	@$(ECHO) "$(COLOR_GREEN)✓ Comparison complete. Results saved to $(COMPARISON_PATH)$(COLOR_RESET)"
 
 # Run individual implementation with variant
 .PHONY: run-sequential run-openmp run-pthreads run-cilk
