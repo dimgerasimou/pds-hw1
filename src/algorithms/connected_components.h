@@ -18,23 +18,32 @@
 #include "matrix.h"
 
 /**
- * @brief Count connected components using sequential label propagation
- * @param matrix Input sparse binary matrix in CSC format
- * @param n_threads Number of threads to use (unused in sequential algorithm)
- * @param algorithm_variant Algorithm variant to use:
- *                          - 0: TODO: add variants.
- *                          - 1: TODO: add variants.
+ * @brief Computes connected components using sequential algorithms.
+ *
+ * Supported variants:
+ *   0: Label propagation (simple, slower)
+ *   1: Union-find (more complex, faster)
+ *
+ * @param matrix Sparse binary matrix in CSC format
+ * @param n_threads Unused (for API compatibility with parallel version)
+ * @param algorithm_variant Algorithm selection (0 or 1)
  * @return Number of connected components, or -1 on error
  */
 int cc_sequential(const CSCBinaryMatrix *matrix, const unsigned int n_threads, const unsigned int algorithm_variant);
 
 /**
- * @brief Count connected components using parallel label propagation with openmp
- * @param matrix Input sparse binary matrix in CSC format
- * @param n_threads Number of threads to use
- * @param algorithm_variant Algorithm variant to use:
- *                          - 0: TODO: add variants.
- *                          - 1: TODO: add variants.
+ * @brief Computes connected components using parallel algorithms.
+ *
+ * Supported variants:
+ *   0: Label propagation (simple, slower)
+ *   1: Union-find with Rem's algorithm (more complex, faster)
+ *
+ * Both algorithms use OpenMP for parallelization and are designed to
+ * scale efficiently across multiple cores.
+ *
+ * @param matrix Sparse binary matrix in CSC format
+ * @param n_threads Number of OpenMP threads to use
+ * @param algorithm_variant Algorithm selection (0 or 1)
  * @return Number of connected components, or -1 on error
  */
 int cc_openmp(const CSCBinaryMatrix *matrix, const unsigned int n_threads, const unsigned int algorithm_variant);
