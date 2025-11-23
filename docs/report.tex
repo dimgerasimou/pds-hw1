@@ -1,7 +1,7 @@
 % !TEX TS-program = XeLaTeX
 % !TeX program = xelatex
 
-\documentclass[11pt]{article}
+\documentclass[11pt,a4paper]{article}
 \usepackage[a4paper,left=15mm,right=15mm,top=20mm,bottom=20mm]{geometry}
 \usepackage{authblk}
 \usepackage{minted}
@@ -11,6 +11,8 @@
 \usepackage{hyperref}
 \usepackage{xcolor}
 \usepackage{float}
+\usepackage{fancyhdr}
+\usepackage{abstract}
 \pgfplotsset{compat=1.18}
 
 \setminted{
@@ -23,27 +25,48 @@
 }
 
 \hypersetup{
-    colorlinks=true,
-    linkcolor=black,
-    filecolor=blue,
-    urlcolor=blue,
+	colorlinks=true,
+	linkcolor=black,
+	filecolor=blue,
+	urlcolor=blue,
 }
 
-\title{\textbf{Connected Components Detection in Large Scale Graphs}}
+% Abstract formatting
+\renewcommand{\abstractnamefont}{\normalfont\Large\bfseries}
+\setlength{\absleftindent}{0pt}
+\setlength{\absrightindent}{0pt}
 
-\author{\textbf{Gerasimou Dimitrios} and \textbf{Stavrianidis Giannis}}
-
-\affil{Department of Electrical and Computer Engineering\\
-Aristotle University of Thessaloniki\\
-050: Parallel and Distributed Systems\vspace{6pt}\\
-Thessaloniki, Greece\\
-November, 2025}
-
-\date{}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small Parallel \& Distributed Systems}
+\fancyhead[R]{\small Connected Components Detection}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
 
 \begin{document}
 
-\maketitle
+\begin{center}
+	{\LARGE\bfseries Connected Components Detection in Large Scale Graphs\par}
+ 
+	\vspace{0.5cm}
+
+	{\large
+	\textbf{Gerasimou Dimitrios} AEM: 10813 \quad and \quad \textbf{Stavrianidis Giannis} AEM: 11065\\
+	}
+
+	\vspace{0.3cm}
+
+	Department of Electrical and Computer Engineering\\
+	Aristotle University of Thessaloniki\\
+	050: Parallel and Distributed Systems
+
+	\vspace{0.3cm}
+
+	Thessaloniki, Greece\\
+	November 2025
+\end{center}
+
+\vspace{0.3cm}
 \thispagestyle{empty}
 
 \begin{abstract}
@@ -131,7 +154,6 @@ eliminate atomic operations and false sharing, improving scalability.
 \begin{table}[htbp]
 	\centering
 	\rowcolors{2}{gray!10}{white}  % Start from row 2, alternate colors
-	% \small
 	\begin{tabular}{rllllll}
 		\toprule
 		\textbf{Index} & \textbf{Dataset} & \textbf{Nodes} & \textbf{Edges} & \textbf{Result} & \textbf{V0 Best (×)} & \textbf{V1 Best (×)}\\
@@ -148,6 +170,7 @@ eliminate atomic operations and false sharing, improving scalability.
 	\caption{Dataset characteristics and best speedup achieved by each algorithm 
 	variant on 8 threads.\\ V0 = Label Propagation, V1 = Union-Find. Result column 
 	shows number of connected components found.}
+	\label{tab:datasets}
 \end{table}
 
 Figures \ref{fig:V0-speedup} and \ref{fig:V1-speedup} compare implementation speedups across datasets for variants 
@@ -370,7 +393,7 @@ Several promising directions for future work include:
 	memory bandwidth utilization)
 \end{itemize}
 
-\textbf{Code Availability:} Complete source code, build instructions, and benchmark scripts are available at
+\noindent\textbf{Code Availability:} Complete source code, build instructions, and benchmark scripts are available at
 \url{https://github.com/gianst2004/pardis2025}
 
 \end{document}
