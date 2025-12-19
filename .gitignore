@@ -34,4 +34,7 @@ docs/*.bbl
 docs/*.blg
 docs/*.fls
 docs/*.fdb_latexmk
+docs/*.synctex.gz
+docs/*.xdv
+docs/_minted
 
