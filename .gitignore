@@ -1,10 +1,37 @@
-data/
-obj/
-build/
+# Build artifacts
 bin/
-benchmarks/
+obj/
+*.o
+*.a
+*.so
+*.out
 
+# Benchmark outputs
+benchmarks/
+data/
+*.log
+
+# Temporary / generated files
+*.tmp
+*.swp
+*~
+core
+
+# OS / editor files
+.DS_Store
 .cache/
 .vscode/
+.idea/
 .clangd
 compile_commands.json
+
+# LaTeX build artifacts
+docs/*.aux
+docs/*.log
+docs/*.out
+docs/*.toc
+docs/*.bbl
+docs/*.blg
+docs/*.fls
+docs/*.fdb_latexmk
+
