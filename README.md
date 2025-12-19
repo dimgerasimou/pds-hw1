@@ -1,7 +1,7 @@
 # Connected Components — Shared-Memory Parallel Implementations
 
 <p align="center">
-  <img src="https://img.shields.io/badge/parallelism-OpenMP%20%7C%20Pthreads%20%7C%20OpenCilk-blueviolet">
+  <img src="https://img.shields.io/badge/parallelism-OpenMP%20%7C%20Pthreads%20%7C%20OpenCilk-blue">
 </p>
 
 Assignment #1 for the Parallel and Distributed Systems course.
